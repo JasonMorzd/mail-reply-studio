@@ -1,0 +1,30 @@
+{
+  "name": "mail-reply-studio",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0",
+    "dev:local": "next dev",
+    "remote": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/remote-access.ps1",
+    "remote:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-cloudflared.ps1",
+    "mac:setup": "bash scripts/macos-setup.sh",
+    "mac:remote": "bash scripts/macos-remote.sh",
+    "mac:logs": "bash scripts/macos-logs.sh",
+    "mac:stop": "bash scripts/macos-stop.sh",
+    "mac:update": "bash scripts/macos-update.sh",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0",
+    "start:local": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.3",
+    "@types/react-dom": "^19.0.2",
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "lucide-react": "^0.468.0",
+    "typescript": "^5.7.2"
+  }
+}
