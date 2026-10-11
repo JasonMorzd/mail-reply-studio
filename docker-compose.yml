@@ -1,0 +1,14 @@
+services:
+  mail-reply-studio:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      APP_ACCESS_PASSWORD: ${APP_ACCESS_PASSWORD:?请在 .env 中设置 APP_ACCESS_PASSWORD}
+      PORT: 3000
+    volumes:
+      - mail_reply_data:/app/.mail-reply-data
+    restart: unless-stopped
+
+volumes:
+  mail_reply_data:
