@@ -1,0 +1,11 @@
+node_modules
+.next
+.mail-reply-data
+.env
+.env.local
+.env.*.local
+tools
+logs
+backups
+work
+outputs
