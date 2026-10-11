@@ -1,0 +1,11 @@
+{$APP_DOMAIN} {
+  encode gzip zstd
+
+  header {
+    X-Content-Type-Options nosniff
+    Referrer-Policy no-referrer
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  }
+
+  reverse_proxy mail-reply-studio:3000
+}
