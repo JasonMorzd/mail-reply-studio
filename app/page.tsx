@@ -72,6 +72,7 @@ export default function Home() {
   const [selectedExample, setSelectedExample] = useState<ConversationExample | null>(null);
   const [importPreview, setImportPreview] = useState<{ filename: string; content: string; examples: ConversationExample[] } | null>(null);
   const [knowledgeImportPreview, setKnowledgeImportPreview] = useState<{ filename: string; items: KnowledgeImportDraft[] } | null>(null);
+  const [knowledgeAiLoading, setKnowledgeAiLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const knowledgeFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -348,6 +349,30 @@ export default function Home() {
     event.target.value = "";
   }
 
+  async function importKnowledgeWithAi(text: string) {
+    const content = text.trim();
+    if (!content) {
+      setToast("先粘贴一段需要整理的内容。");
+      return;
+    }
+    setKnowledgeAiLoading(true);
+    try {
+      const response = await fetch("/api/knowledge/ai-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: content })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "AI 整理失败。");
+      setKnowledgeImportPreview({ filename: payload.filename, items: payload.items });
+      setToast(payload.warning ?? `AI 已整理出 ${payload.count} 条问答，请确认后加入知识库。`);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "AI 整理失败，请检查模型设置。");
+    } finally {
+      setKnowledgeAiLoading(false);
+    }
+  }
+
   async function confirmKnowledgeImport() {
     if (!knowledgeImportPreview) return;
     const response = await fetch("/api/knowledge/import", {
@@ -489,7 +514,7 @@ export default function Home() {
         )}
 
         {view === "library" && <LibraryView examples={filteredExamples} searchTerm={searchTerm} setSearchTerm={setSearchTerm} onImport={() => fileInputRef.current?.click()} onExport={() => void exportData()} onSelect={setSelectedExample} onDelete={(id) => void deleteExample(id)} />}
-        {view === "knowledge" && <KnowledgeView identityProfile={identityProfile} knowledge={knowledge} onImport={() => knowledgeFileInputRef.current?.click()} onSaveIdentity={saveIdentityProfile} onCreate={createKnowledgeItem} onSave={updateKnowledgeItem} onDelete={deleteKnowledgeItem} />}
+        {view === "knowledge" && <KnowledgeView identityProfile={identityProfile} knowledge={knowledge} aiLoading={knowledgeAiLoading} onImport={() => knowledgeFileInputRef.current?.click()} onAiImport={importKnowledgeWithAi} onSaveIdentity={saveIdentityProfile} onCreate={createKnowledgeItem} onSave={updateKnowledgeItem} onDelete={deleteKnowledgeItem} />}
         {view === "settings" && <SettingsView styleProfile={styleProfile} modelSettings={modelSettings} onSave={async (profile) => { const response = await fetch("/api/style-profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(profile) }); if (response.ok) { setStyleProfile(profile); setToast("语气设置已保存。"); } }} onSaveModel={saveModelSettings} onClear={() => void clearData()} onExport={() => void exportData()} />}
       </section>
 
@@ -611,9 +636,30 @@ function LibraryView({ examples, searchTerm, setSearchTerm, onImport, onExport, 
   return <div className="library-layout"><div className="library-toolbar"><div className="search-box"><Search size={16} /><input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="搜索历史对话…" /></div><div className="toolbar-actions"><button className="quiet-button" onClick={onExport}><FileDown size={15} /> 导出</button><button className="generate-button small" onClick={onImport}><Upload size={15} /> 导入历史邮件</button></div></div><div className="library-header-row"><span>语气库中有 {formatCount(examples.length)}</span><span>点击对话查看和编辑</span></div>{examples.length ? <div className="thread-list">{examples.map((example) => <button className="thread-row" key={example.id} onClick={() => onSelect(example)}><div className="thread-icon"><MailIcon /></div><div className="thread-main"><strong>{example.subject || "未命名对话"}</strong><span>{example.messages.at(-1)?.body.slice(0, 120) || "空邮件"}</span></div><div className="thread-tags"><span>{example.language === "zh" ? "中文" : example.language === "en" ? "英文" : "中英混合"}</span><span>{example.messages.length} 条消息</span></div><button className="row-delete" aria-label="删除历史对话" onClick={(event) => { event.stopPropagation(); onDelete(example.id); }}><Trash2 size={15} /></button></button>)}</div> : <div className="large-empty"><Archive size={24} /><h3>语气库还是空的</h3><p>导入几封过去的邮件，我们就能把它们作为回复参考。</p><button className="generate-button small" onClick={onImport}><Upload size={15} /> 导入历史邮件</button></div>}</div>;
 }
 
-function KnowledgeView({ identityProfile, knowledge, onImport, onSaveIdentity, onCreate, onSave, onDelete }: { identityProfile: IdentityProfile | null; knowledge: KnowledgeItem[]; onImport: () => void; onSaveIdentity: (profile: IdentityProfile) => Promise<void>; onCreate: (input: Pick<KnowledgeItem, "title" | "question" | "answer" | "tags">) => Promise<void>; onSave: (item: KnowledgeItem) => Promise<void>; onDelete: (id: string) => Promise<void> }) {
+function KnowledgeView({
+  identityProfile,
+  knowledge,
+  aiLoading,
+  onImport,
+  onAiImport,
+  onSaveIdentity,
+  onCreate,
+  onSave,
+  onDelete
+}: {
+  identityProfile: IdentityProfile | null;
+  knowledge: KnowledgeItem[];
+  aiLoading: boolean;
+  onImport: () => void;
+  onAiImport: (text: string) => Promise<void>;
+  onSaveIdentity: (profile: IdentityProfile) => Promise<void>;
+  onCreate: (input: Pick<KnowledgeItem, "title" | "question" | "answer" | "tags">) => Promise<void>;
+  onSave: (item: KnowledgeItem) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
   const [identity, setIdentity] = useState<IdentityProfile | null>(identityProfile);
   const [newItem, setNewItem] = useState({ title: "", question: "", answer: "", tags: "" });
+  const [rawKnowledgeText, setRawKnowledgeText] = useState("");
   useEffect(() => setIdentity(identityProfile), [identityProfile]);
   if (!identity) return <div className="loading-state">正在加载知识库…</div>;
 
@@ -645,7 +691,20 @@ function KnowledgeView({ identityProfile, knowledge, onImport, onSaveIdentity, o
       <button className="generate-button small" onClick={() => void onSaveIdentity(identity)}><Check size={15} /> 保存身份档案</button>
     </section>
     <section className="knowledge-section">
-      <div className="knowledge-section-heading"><div><span className="step">02</span><div><p className="section-kicker">问答知识</p><h3>把你反复回答过的内容存下来</h3></div></div><div className="knowledge-heading-actions"><span className="tiny-label">可检索</span><button className="quiet-button" onClick={onImport}><Upload size={15} /> 从文件导入</button></div></div>
+      <div className="knowledge-section-heading"><div><span className="step">02</span><div><p className="section-kicker">AI 整理</p><h3>直接丢一整段内容进来</h3></div></div><div className="knowledge-heading-actions"><span className="tiny-label">DeepSeek / OpenAI-compatible</span><button className="quiet-button" onClick={onImport}><Upload size={15} /> 从文件导入</button></div></div>
+      <div className="knowledge-ai-import">
+        <label>原始内容<textarea value={rawKnowledgeText} onChange={(event) => setRawKnowledgeText(event.target.value)} placeholder={"把客户聊天记录、邮件往来、产品说明、你以前回答过的内容直接粘贴到这里。\n\nAI 会自动识别哪些内容适合沉淀成问答知识；整理结果会先给你预览，不会直接入库。"} /></label>
+        <div className="knowledge-ai-footer">
+          <span>{rawKnowledgeText.length} 字</span>
+          <div className="toolbar-actions">
+            <button className="quiet-button" onClick={() => setRawKnowledgeText("")}>清空</button>
+            <button className="generate-button small" disabled={aiLoading || !rawKnowledgeText.trim()} onClick={() => void onAiImport(rawKnowledgeText)}><Sparkles size={15} /> {aiLoading ? "AI 正在整理…" : "AI 整理为问答"}</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section className="knowledge-section">
+      <div className="knowledge-section-heading"><div><span className="step">03</span><div><p className="section-kicker">手动补充</p><h3>也可以单独添加一条问答</h3></div></div><span className="tiny-label">可检索</span></div>
       <div className="knowledge-create">
         <label>标题<input value={newItem.title} onChange={(event) => setNewItem({ ...newItem, title: event.target.value })} placeholder="例如：服务介绍" /></label>
         <label>问题<textarea value={newItem.question} onChange={(event) => setNewItem({ ...newItem, question: event.target.value })} placeholder="别人通常会怎么问？" /></label>
@@ -653,6 +712,9 @@ function KnowledgeView({ identityProfile, knowledge, onImport, onSaveIdentity, o
         <label>标签<input value={newItem.tags} onChange={(event) => setNewItem({ ...newItem, tags: event.target.value })} placeholder="例如：产品、价格、合作" /></label>
         <button className="generate-button small" onClick={() => void addItem()}><span>+</span> 添加问答</button>
       </div>
+    </section>
+    <section className="knowledge-section">
+      <div className="knowledge-section-heading"><div><span className="step">04</span><div><p className="section-kicker">已入库</p><h3>之后回复会引用这些内容</h3></div></div><span className="tiny-label">{knowledge.length} 条</span></div>
       <div className="knowledge-list">
         {knowledge.length ? knowledge.map((item) => <KnowledgeRow key={item.id} item={item} onSave={onSave} onDelete={onDelete} />) : <div className="large-empty knowledge-empty"><BookOpen size={24} /><h3>还没有问答知识</h3><p>把你经常解释的内容写成问题和答案，之后相同问题就能直接复用。</p></div>}
       </div>
