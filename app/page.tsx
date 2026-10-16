@@ -304,7 +304,8 @@ export default function Home() {
     });
     const payload = await response.json();
     if (response.ok) {
-      setKnowledge((current) => [payload, ...current]);
+      setKnowledge((current) => [payload.item, ...current]);
+      if (payload.styleProfile) setStyleProfile(payload.styleProfile);
       setToast("问答已加入知识库。");
     } else {
       setToast(payload.error ?? "保存知识失败。");
@@ -318,8 +319,9 @@ export default function Home() {
       body: JSON.stringify(item)
     });
     if (response.ok) {
-      const updated = await response.json();
-      setKnowledge((current) => current.map((entry) => entry.id === updated.id ? updated : entry));
+      const payload = await response.json();
+      setKnowledge((current) => current.map((entry) => entry.id === payload.item.id ? payload.item : entry));
+      if (payload.styleProfile) setStyleProfile(payload.styleProfile);
       setToast("知识条目已保存。");
     }
   }
@@ -327,7 +329,9 @@ export default function Home() {
   async function deleteKnowledgeItem(id: string) {
     const response = await fetch(`/api/knowledge/${id}`, { method: "DELETE" });
     if (response.ok) {
+      const payload = await response.json();
       setKnowledge((current) => current.filter((item) => item.id !== id));
+      if (payload.styleProfile) setStyleProfile(payload.styleProfile);
       setToast("知识条目已删除。");
     }
   }
@@ -386,6 +390,7 @@ export default function Home() {
       return;
     }
     setKnowledge((current) => [...payload.items, ...current]);
+    if (payload.styleProfile) setStyleProfile(payload.styleProfile);
     setKnowledgeImportPreview(null);
     setToast(`已加入 ${payload.imported} 条问答知识。`);
   }
@@ -519,7 +524,7 @@ export default function Home() {
       </section>
 
       <input ref={fileInputRef} type="file" accept=".txt,.md,.markdown,.csv,.json" hidden onChange={(event) => void importFile(event)} />
-      <input ref={knowledgeFileInputRef} type="file" accept=".docx,.txt,.md,.markdown,.csv,.json" hidden onChange={(event) => void importKnowledgeFile(event)} />
+      <input ref={knowledgeFileInputRef} type="file" accept=".docx,.eml,.txt,.md,.markdown,.csv,.json,message/rfc822" hidden onChange={(event) => void importKnowledgeFile(event)} />
       {selectedExample && <ExampleModal example={selectedExample} onClose={() => setSelectedExample(null)} onSave={updateExample} />}
       {importPreview && <ImportPreviewModal preview={importPreview} onCancel={() => setImportPreview(null)} onConfirm={() => void confirmImport()} onChange={(examples) => setImportPreview({ ...importPreview, examples })} />}
       {knowledgeImportPreview && <KnowledgeImportModal preview={knowledgeImportPreview} onCancel={() => setKnowledgeImportPreview(null)} onConfirm={() => void confirmKnowledgeImport()} onChange={(items) => setKnowledgeImportPreview({ ...knowledgeImportPreview, items })} />}
@@ -633,7 +638,7 @@ function InstantReplyView({
 }
 
 function LibraryView({ examples, searchTerm, setSearchTerm, onImport, onExport, onSelect, onDelete }: { examples: ConversationExample[]; searchTerm: string; setSearchTerm: (value: string) => void; onImport: () => void; onExport: () => void; onSelect: (example: ConversationExample) => void; onDelete: (id: string) => void }) {
-  return <div className="library-layout"><div className="library-toolbar"><div className="search-box"><Search size={16} /><input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="搜索历史对话…" /></div><div className="toolbar-actions"><button className="quiet-button" onClick={onExport}><FileDown size={15} /> 导出</button><button className="generate-button small" onClick={onImport}><Upload size={15} /> 导入历史邮件</button></div></div><div className="library-header-row"><span>语气库中有 {formatCount(examples.length)}</span><span>点击对话查看和编辑</span></div>{examples.length ? <div className="thread-list">{examples.map((example) => <button className="thread-row" key={example.id} onClick={() => onSelect(example)}><div className="thread-icon"><MailIcon /></div><div className="thread-main"><strong>{example.subject || "未命名对话"}</strong><span>{example.messages.at(-1)?.body.slice(0, 120) || "空邮件"}</span></div><div className="thread-tags"><span>{example.language === "zh" ? "中文" : example.language === "en" ? "英文" : "中英混合"}</span><span>{example.messages.length} 条消息</span></div><button className="row-delete" aria-label="删除历史对话" onClick={(event) => { event.stopPropagation(); onDelete(example.id); }}><Trash2 size={15} /></button></button>)}</div> : <div className="large-empty"><Archive size={24} /><h3>语气库还是空的</h3><p>导入几封过去的邮件，我们就能把它们作为回复参考。</p><button className="generate-button small" onClick={onImport}><Upload size={15} /> 导入历史邮件</button></div>}</div>;
+  return <div className="library-layout"><div className="library-toolbar"><div className="search-box"><Search size={16} /><input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="搜索历史对话…" /></div><div className="toolbar-actions"><button className="quiet-button" onClick={onExport}><FileDown size={15} /> 导出</button><button className="generate-button small" onClick={onImport}><Upload size={15} /> 导入历史邮件</button></div></div><div className="library-header-row"><span>语气库中有 {formatCount(examples.length)}</span><span>语气特征与知识库共用来源</span></div>{examples.length ? <div className="thread-list">{examples.map((example) => <button className="thread-row" key={example.id} onClick={() => onSelect(example)}><div className="thread-icon"><MailIcon /></div><div className="thread-main"><strong>{example.subject || "未命名对话"}</strong><span>{example.messages.at(-1)?.body.slice(0, 120) || "空邮件"}</span></div><div className="thread-tags"><span>{example.language === "zh" ? "中文" : example.language === "en" ? "英文" : "中英混合"}</span><span>{example.messages.length} 条消息</span></div><button className="row-delete" aria-label="删除历史对话" onClick={(event) => { event.stopPropagation(); onDelete(example.id); }}><Trash2 size={15} /></button></button>)}</div> : <div className="large-empty"><Archive size={24} /><h3>语气库还是空的</h3><p>导入几封过去的邮件，或在知识库添加问答，我们就能学习你的表达方式。</p><button className="generate-button small" onClick={onImport}><Upload size={15} /> 导入历史邮件</button></div>}</div>;
 }
 
 function KnowledgeView({
@@ -660,6 +665,7 @@ function KnowledgeView({
   const [identity, setIdentity] = useState<IdentityProfile | null>(identityProfile);
   const [newItem, setNewItem] = useState({ title: "", question: "", answer: "", tags: "" });
   const [rawKnowledgeText, setRawKnowledgeText] = useState("");
+  const [expandedKnowledgeId, setExpandedKnowledgeId] = useState<string | null>(null);
   useEffect(() => setIdentity(identityProfile), [identityProfile]);
   if (!identity) return <div className="loading-state">正在加载知识库…</div>;
 
@@ -676,7 +682,7 @@ function KnowledgeView({
 
   return <div className="knowledge-layout">
     <div className="knowledge-intro">
-      <div><span className="panel-label">身份与事实</span><h2>让助手知道“你是谁”，也知道“该怎么答”。</h2><p>身份档案会参与每次生成；问答条目会被检索，遇到相同或相近的问题时作为事实依据。生成结果旁会显示实际引用的条目。</p></div>
+      <div><span className="panel-label">身份与事实</span><h2>让助手知道“你是谁”，也知道“该怎么答”。</h2><p>身份档案会参与每次生成；启用的问答条目会被检索，也会同时参与语气提取，不需要重复导入到语气库。</p></div>
       <div className="knowledge-stats"><span><strong>{knowledge.filter((item) => item.enabled).length}</strong> 条启用知识</span><span><strong>{knowledge.filter((item) => !item.enabled).length}</strong> 条已停用</span></div>
     </div>
     <section className="identity-card">
@@ -714,21 +720,37 @@ function KnowledgeView({
       </div>
     </section>
     <section className="knowledge-section">
-      <div className="knowledge-section-heading"><div><span className="step">04</span><div><p className="section-kicker">已入库</p><h3>之后回复会引用这些内容</h3></div></div><span className="tiny-label">{knowledge.length} 条</span></div>
+      <div className="knowledge-section-heading"><div><span className="step">04</span><div><p className="section-kicker">已入库</p><h3>之后回复会引用这些内容</h3></div></div><span className="tiny-label">{knowledge.length} 条 · 点击展开</span></div>
       <div className="knowledge-list">
-        {knowledge.length ? knowledge.map((item) => <KnowledgeRow key={item.id} item={item} onSave={onSave} onDelete={onDelete} />) : <div className="large-empty knowledge-empty"><BookOpen size={24} /><h3>还没有问答知识</h3><p>把你经常解释的内容写成问题和答案，之后相同问题就能直接复用。</p></div>}
+        {knowledge.length ? knowledge.map((item) => <KnowledgeRow key={item.id} item={item} expanded={expandedKnowledgeId === item.id} onToggle={() => setExpandedKnowledgeId((current) => current === item.id ? null : item.id)} onSave={onSave} onDelete={onDelete} />) : <div className="large-empty knowledge-empty"><BookOpen size={24} /><h3>还没有问答知识</h3><p>把你经常解释的内容写成问题和答案，之后相同问题就能直接复用。</p></div>}
       </div>
     </section>
   </div>;
 }
 
-function KnowledgeRow({ item, onSave, onDelete }: { item: KnowledgeItem; onSave: (item: KnowledgeItem) => Promise<void>; onDelete: (id: string) => Promise<void> }) {
+function KnowledgeRow({ item, expanded, onToggle, onSave, onDelete }: { item: KnowledgeItem; expanded: boolean; onToggle: () => void; onSave: (item: KnowledgeItem) => Promise<void>; onDelete: (id: string) => Promise<void> }) {
   const [draft, setDraft] = useState(item);
   useEffect(() => setDraft(item), [item]);
-  return <article className={`knowledge-row ${draft.enabled ? "" : "disabled"}`}>
-    <div className="knowledge-row-top"><div><span className="knowledge-status">{draft.enabled ? "已启用" : "已停用"}</span><input className="knowledge-title" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div><div className="knowledge-row-actions"><label className="checkbox-label"><input type="checkbox" checked={draft.enabled} onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} /> 用于生成</label><button className="row-delete" aria-label="删除知识条目" onClick={() => void onDelete(draft.id)}><Trash2 size={15} /></button></div></div>
-    <div className="knowledge-row-grid"><label>问题<textarea value={draft.question} onChange={(event) => setDraft({ ...draft, question: event.target.value })} /></label><label>答案<textarea value={draft.answer} onChange={(event) => setDraft({ ...draft, answer: event.target.value })} /></label></div>
-    <div className="knowledge-row-footer"><input value={draft.tags.join("，")} onChange={(event) => setDraft({ ...draft, tags: event.target.value.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean) })} placeholder="标签" /><button className="quiet-button" onClick={() => void onSave(draft)}><Check size={14} /> 保存条目</button></div>
+  return <article className={`knowledge-row ${draft.enabled ? "" : "disabled"} ${expanded ? "expanded" : ""}`}>
+    <div className="knowledge-row-summary">
+      <button className="knowledge-row-toggle" type="button" onClick={onToggle} aria-expanded={expanded}>
+        <ChevronDown size={17} className="knowledge-row-chevron" />
+        <span className="knowledge-row-summary-copy">
+          <strong>{draft.title || draft.question || "未命名知识"}</strong>
+          <span>{draft.question || "没有填写问题"}{draft.answer ? ` · ${draft.answer.slice(0, 100)}${draft.answer.length > 100 ? "…" : ""}` : ""}</span>
+        </span>
+      </button>
+      <div className="knowledge-row-actions">
+        <span className="knowledge-status">{draft.enabled ? "已启用" : "已停用"}</span>
+        <label className="checkbox-label"><input type="checkbox" checked={draft.enabled} onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} /> 用于生成</label>
+        <button className="row-delete" aria-label="删除知识条目" onClick={() => void onDelete(draft.id)}><Trash2 size={15} /></button>
+      </div>
+    </div>
+    {expanded && <div className="knowledge-row-details">
+      <label className="knowledge-row-title-field">标题<input className="knowledge-title" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
+      <div className="knowledge-row-grid"><label>问题<textarea value={draft.question} onChange={(event) => setDraft({ ...draft, question: event.target.value })} /></label><label>答案<textarea value={draft.answer} onChange={(event) => setDraft({ ...draft, answer: event.target.value })} /></label></div>
+      <div className="knowledge-row-footer"><input value={draft.tags.join("，")} onChange={(event) => setDraft({ ...draft, tags: event.target.value.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean) })} placeholder="标签" /><button className="quiet-button" onClick={() => void onSave(draft)}><Check size={14} /> 保存条目</button></div>
+    </div>}
   </article>;
 }
 

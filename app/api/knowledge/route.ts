@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { readData, updateKnowledge } from "@/lib/store";
+import { buildStyleProfileFromSources } from "@/lib/mail";
+import { readData, writeData } from "@/lib/store";
 import type { KnowledgeItem } from "@/lib/types";
 
 export async function GET() {
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
   };
   const data = await readData();
   data.knowledge = [item, ...data.knowledge];
-  await updateKnowledge(data.knowledge);
-  return NextResponse.json(item, { status: 201 });
+  data.styleProfile = buildStyleProfileFromSources(data.examples, data.knowledge, data.styleProfile);
+  await writeData(data);
+  return NextResponse.json({ item, styleProfile: data.styleProfile }, { status: 201 });
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { parseKnowledgeFile, type KnowledgeImportDraft } from "@/lib/knowledge-import";
-import { readData, updateKnowledge } from "@/lib/store";
+import { buildStyleProfileFromSources } from "@/lib/mail";
+import { readData, writeData } from "@/lib/store";
 import type { KnowledgeItem } from "@/lib/types";
 
 const maxUploadBytes = 10 * 1024 * 1024;
@@ -34,8 +35,8 @@ export async function POST(request: Request) {
       }
       const filename = file.name || "knowledge.txt";
       const extension = filename.toLowerCase().split(".").pop();
-      if (!["docx", "txt", "md", "markdown", "csv", "json"].includes(extension ?? "")) {
-        return NextResponse.json({ error: "支持 Word .docx、TXT、Markdown、CSV 和 JSON 文件。" }, { status: 415 });
+      if (!["docx", "eml", "txt", "md", "markdown", "csv", "json"].includes(extension ?? "")) {
+        return NextResponse.json({ error: "支持 Word .docx、邮件 .eml、TXT、Markdown、CSV 和 JSON 文件。" }, { status: 415 });
       }
       const drafts = await parseKnowledgeFile(filename, Buffer.from(await file.arrayBuffer()));
       if (!drafts.length) {
@@ -61,8 +62,10 @@ export async function POST(request: Request) {
       updatedAt: now
     }));
     const data = await readData();
-    await updateKnowledge([...items, ...data.knowledge]);
-    return NextResponse.json({ imported: items.length, items });
+    data.knowledge = [...items, ...data.knowledge];
+    data.styleProfile = buildStyleProfileFromSources(data.examples, data.knowledge, data.styleProfile);
+    await writeData(data);
+    return NextResponse.json({ imported: items.length, items, styleProfile: data.styleProfile });
   } catch (error) {
     const message = error instanceof Error ? error.message : "文件解析失败。";
     return NextResponse.json({ error: message }, { status: 400 });

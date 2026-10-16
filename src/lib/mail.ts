@@ -150,6 +150,30 @@ export function buildStyleProfile(examples: ConversationExample[], existing: Sty
   };
 }
 
+export function buildStyleProfileFromSources(
+  examples: ConversationExample[],
+  knowledge: KnowledgeItem[],
+  existing: StyleProfile
+): StyleProfile {
+  const knowledgeExamples: ConversationExample[] = knowledge
+    .filter((item) => item.enabled && item.answer.trim())
+    .map((item) => {
+      const now = new Date().toISOString();
+      return {
+        id: `knowledge-${item.id}`,
+        subject: item.title,
+        messages: [{ role: "sent", body: item.answer }],
+        language: detectLanguage(item.answer),
+        tags: item.tags,
+        included: true,
+        createdAt: now,
+        updatedAt: now
+      };
+    });
+
+  return buildStyleProfile([...examples, ...knowledgeExamples], existing);
+}
+
 export function rankExamples(query: EmailMessage[], examples: ConversationExample[], limit = 5) {
   const haystack = query.map((item) => `${item.subject ?? ""}\n${item.body}`).join("\n").toLowerCase();
   const tokens = new Set(haystack.split(/[\s,，。！？.!?;；:：()[\]{}]+/).filter((token) => token.length > 1));

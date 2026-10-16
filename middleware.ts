@@ -22,7 +22,8 @@ export function middleware(request: NextRequest) {
   return new NextResponse("请输入访问密码后再使用邮件回复助手。", {
     status: 401,
     headers: {
-      "WWW-Authenticate": 'Basic realm="邮件回复助手", charset="UTF-8"'
+      // HTTP authentication headers must stay within the ByteString range.
+      "WWW-Authenticate": 'Basic realm="Mail Reply Studio"'
     }
   });
 }

@@ -1,0 +1,17 @@
+services:
+  mail-reply-studio:
+    build: .
+    ports:
+      - "8080:3000"
+    environment:
+      APP_ACCESS_PASSWORD: ${APP_ACCESS_PASSWORD:?请在 .env 中设置 APP_ACCESS_PASSWORD}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      PORT: 3000
+    volumes:
+      - mail_reply_data:/app/.mail-reply-data
+    restart: unless-stopped
+
+volumes:
+  mail_reply_data:
